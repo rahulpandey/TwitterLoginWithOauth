@@ -3,18 +3,20 @@ package com.oauthexample;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
 
-import com.android.volley.VolleyError;
+import com.TwitterApplication;
 import com.model.TwitterProfile;
 import com.oauth.callbacks.OauthAuthenticateListener;
 import com.oauth.config.OauthConfig;
 import com.oauth.exception.OauthAuthenticationException;
+import com.service.TwitterRestAdapter;
 import com.util.Constant;
-import com.volleynetwork.GsonRequest;
-import com.volleynetwork.VolleySingleton;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 
 public class MainActivity extends AppCompatActivity implements OauthAuthenticateListener {
@@ -50,34 +52,30 @@ public class MainActivity extends AppCompatActivity implements OauthAuthenticate
 
     @Override
     public void onOauthAuthenticationDone(final String token, final String tokenSecret) {
-        Log.d(TAG, "token=>" + token);
-        Log.d(TAG, "Token Secret=>" + tokenSecret);
-        GsonRequest<TwitterProfile> mRequest = new GsonRequest<>(
-                Constant.BASE_URL + "account/verify_credentials.json",
-                TwitterProfile.class,
-                new com.android.volley.Response.Listener<TwitterProfile>() {
-                    @Override
-                    public void onResponse(TwitterProfile mTwitterProfile) {
-                        showProgressBar(false);
-                        startProfileActivity(mTwitterProfile, token, tokenSecret);
-                    }
-                },
-                new com.android.volley.Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError volleyError) {
-                        showProgressBar(false);
-                    }
-                });
-        VolleySingleton
-                .getInstance(getApplicationContext(), token, tokenSecret)
-                .addToRequestQueue(mRequest);
+        TwitterApplication.getInstance().saveTokens(token, tokenSecret);
+        Call<TwitterProfile> profile = TwitterRestAdapter.getInstance().getProfile();
+        profile.enqueue(new Callback<TwitterProfile>() {
+            @Override
+            public void onResponse(Call<TwitterProfile> call, Response<TwitterProfile> response) {
+                showProgressBar(false);
+                if (response.isSuccessful()) {
+                    TwitterProfile twitterProfile = response.body();
+                    startProfileActivity(twitterProfile);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<TwitterProfile> call, Throwable t) {
+                showProgressBar(false);
+            }
+        });
+
     }
 
-    private void startProfileActivity(TwitterProfile mTwitterProfile, String token, String tokenSecret) {
+    private void startProfileActivity(TwitterProfile mTwitterProfile) {
         Intent mIntent = new Intent(this, ProfileActivity.class);
         mIntent.putExtra(Constant.KEY_TWITTER_PROFILE, mTwitterProfile);
-        mIntent.putExtra(Constant.KEY_TOKEN, token);
-        mIntent.putExtra(Constant.KEY_TOKEN_SECRET, tokenSecret);
         startActivity(mIntent);
     }
 
